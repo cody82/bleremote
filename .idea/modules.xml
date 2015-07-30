@@ -2,8 +2,8 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/BleRemote.iml" filepath="$PROJECT_DIR$/BleRemote.iml" />
       <module fileurl="file://$PROJECT_DIR$/app/app.iml" filepath="$PROJECT_DIR$/app/app.iml" />
+      <module fileurl="file://$PROJECT_DIR$/bleremote.iml" filepath="$PROJECT_DIR$/bleremote.iml" />
     </modules>
   </component>
 </project>
