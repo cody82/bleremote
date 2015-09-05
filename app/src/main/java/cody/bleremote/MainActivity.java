@@ -96,6 +96,7 @@ public class MainActivity extends ActionBarActivity {
             msg[5] = (byte)(blink_right ? 1 : 0);
 
             control.setValue(msg);
+            control.setWriteType(BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE);
             btGatt.writeCharacteristic(control);
         }
     }
