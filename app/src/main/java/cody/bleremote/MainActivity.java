@@ -291,7 +291,10 @@ public class MainActivity extends ActionBarActivity {
         public void onLeScan(final BluetoothDevice device, final int rssi, final byte[] scanRecord) {
             // your implementation here
             btAdapter.stopLeScan(leScanCallback);
-            BluetoothGatt bluetoothGatt = device.connectGatt(x, false, btleGattCallback);
+            String mac = device.getAddress();
+            if(mac.compareTo("D1:E4:D4:1E:12:F2") == 0) {
+                BluetoothGatt bluetoothGatt = device.connectGatt(x, false, btleGattCallback);
+            }
         }
     };
 
