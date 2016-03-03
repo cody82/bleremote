@@ -292,7 +292,8 @@ public class MainActivity extends ActionBarActivity {
             // your implementation here
             btAdapter.stopLeScan(leScanCallback);
             String mac = device.getAddress();
-            if(mac.compareTo("D1:E4:D4:1E:12:F2") == 0) {
+            if(mac.compareTo("D1:E4:D4:1E:12:F2") == 0 ||
+                    mac.compareTo("F2:24:4D:E3:42:0F") == 0) {
                 BluetoothGatt bluetoothGatt = device.connectGatt(x, false, btleGattCallback);
             }
         }
