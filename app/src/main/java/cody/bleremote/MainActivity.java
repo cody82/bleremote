@@ -53,6 +53,7 @@ public class MainActivity extends ActionBarActivity {
     static volatile boolean beep = false;
 
     MainActivity x = this;
+    static BluetoothDevice remoteDevice;
 
     public static boolean setBluetooth(BluetoothAdapter bluetoothAdapter, boolean enable) {
         boolean isEnabled = bluetoothAdapter.isEnabled();
@@ -159,8 +160,18 @@ public class MainActivity extends ActionBarActivity {
             //}
         }
 
-        if(!btAdapter.startLeScan(leScanCallback))
-            throw new RuntimeException("lescan");
+        remoteDevice = btAdapter.getRemoteDevice("F2:24:4D:E3:42:0F");
+
+        if(remoteDevice == null) {
+            if (!btAdapter.startLeScan(leScanCallback))
+                throw new RuntimeException("lescan");
+            setState("Scanning");
+        }
+        else
+        {
+            setState("Connecting");
+            btGatt = remoteDevice.connectGatt(x, false, btleGattCallback);
+        }
 
         TimerTask timer3= new TimerTask(){
             @Override
@@ -290,11 +301,13 @@ public class MainActivity extends ActionBarActivity {
         @Override
         public void onLeScan(final BluetoothDevice device, final int rssi, final byte[] scanRecord) {
             // your implementation here
-            btAdapter.stopLeScan(leScanCallback);
             String mac = device.getAddress();
             if(mac.compareTo("D1:E4:D4:1E:12:F2") == 0 ||
                     mac.compareTo("F2:24:4D:E3:42:0F") == 0) {
-                BluetoothGatt bluetoothGatt = device.connectGatt(x, false, btleGattCallback);
+                remoteDevice = device;
+                btAdapter.stopLeScan(leScanCallback);
+                setState("Connecting");
+                btGatt = device.connectGatt(x, false, btleGattCallback);
             }
         }
     };
@@ -317,22 +330,23 @@ public class MainActivity extends ActionBarActivity {
 
         @Override
         public void onConnectionStateChange(final BluetoothGatt gatt, final int status, final int newState) {
-            // this will get called when a device connects or disconnects
-            if(newState == BluetoothProfile.STATE_CONNECTED)
-            {
-                btGatt = gatt;
-                gatt.discoverServices();
-            }
-            else if(newState == BluetoothProfile.STATE_DISCONNECTED)
-            {
-                btAdapter.startLeScan(leScanCallback);
-                btGatt = null;
-                control = null;
+            if(remoteDevice != null && gatt.getDevice().getAddress() == remoteDevice.getAddress()) {
+                // this will get called when a device connects or disconnects
+                if (newState == BluetoothProfile.STATE_CONNECTED) {
+                    setState("Discover Services");
+                    gatt.discoverServices();
+                } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+                    setState("Scanning");
+                    btAdapter.startLeScan(leScanCallback);
+                    control = null;
+                }
             }
         }
 
         @Override
         public void onServicesDiscovered(final BluetoothGatt gatt, final int status) {
+            if(!gatt.equals(btGatt))
+                return;
             // this will get called after the client initiates a BluetoothGatt.discoverServices() call
             List<BluetoothGattService> services = gatt.getServices();
             for (BluetoothGattService service : services) {
@@ -340,7 +354,9 @@ public class MainActivity extends ActionBarActivity {
                     List<BluetoothGattCharacteristic> characteristics = service.getCharacteristics();
                     for (BluetoothGattCharacteristic c : characteristics) {
                         if(c.getUuid().compareTo(UUID.fromString("0000a010-0000-1000-8000-00805F9B34FB"))==0){
+                            setState("Connected");
                             control = c;
+                            return;
                         }
                     }
                 }
@@ -353,6 +369,15 @@ public class MainActivity extends ActionBarActivity {
         }
     };
 
+    public void setState(final String state) {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                ((TextView)findViewById(R.id.textView2)).setText(state);
+            }
+        });
+
+    }
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         // Inflate the menu; this adds items to the action bar if it is present.
@@ -372,6 +397,10 @@ public class MainActivity extends ActionBarActivity {
             return true;
         }
         else if(id == R.id.action_quit) {
+            if(btGatt!=null) {
+                btGatt.disconnect();
+                btGatt.close();
+            }
             finish();
             System.exit(0);
         }
