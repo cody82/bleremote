@@ -37,10 +37,13 @@ import java.util.UUID;
 public class MainActivity extends ActionBarActivity {
     static volatile BluetoothAdapter btAdapter;
     static volatile BluetoothGattCharacteristic control;
+    static volatile BluetoothGattCharacteristic battery;
     static volatile BluetoothGatt btGatt;
 
     SensorManager mSensorManager;
     Sensor mSensor;
+
+    static volatile float angle = 0;
 
     static volatile boolean left = false;
     static volatile boolean right = false;
@@ -51,6 +54,7 @@ public class MainActivity extends ActionBarActivity {
     static volatile boolean blink_left = false;
     static volatile boolean blink_right = false;
     static volatile boolean beep = false;
+
 
     MainActivity x = this;
     static BluetoothDevice remoteDevice;
@@ -67,8 +71,11 @@ public class MainActivity extends ActionBarActivity {
         return true;
     }
 
+    int sendtick = 0;
+
     void Send()
     {
+        sendtick++;
         if(control != null)
         {
             byte[] msg = new byte[7];
@@ -83,13 +90,25 @@ public class MainActivity extends ActionBarActivity {
                 msg[1] = -40;
             }
 
-            if (right == left) {
-                msg[0] = -20;
-            } else if (right) {
-                msg[0] = 70;
-            } else if (left) {
-                msg[0] = -100;
+            if(angle==0) {
+                if (right == left) {
+                    msg[0] = -20;
+                } else if (right) {
+                    msg[0] = 70;
+                } else if (left) {
+                    msg[0] = -100;
+                }
             }
+            else {
+
+                float max = 70;
+                float min = -100;
+                float mid = (max + min) / 2;
+                float range = (max - min) / 2;
+
+                msg[0] = (byte) ((angle / 90) * range + mid);
+            }
+
             msg[6] = (byte) (beep ? 1 : 0);
             msg[3] = (byte) (top_light ? 1 : 0);
             msg[2] = front_light;
@@ -99,6 +118,11 @@ public class MainActivity extends ActionBarActivity {
             control.setValue(msg);
             control.setWriteType(BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE);
             btGatt.writeCharacteristic(control);
+
+        }
+
+        if((battery != null) && (sendtick % 5 == 0)){
+            btGatt.readCharacteristic(battery);
         }
     }
     @Override
@@ -122,27 +146,78 @@ public class MainActivity extends ActionBarActivity {
                                      return true;
                                  }
                              });
+                             */
         mSensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
-        mSensor = mSensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR);
+        //mSensor = mSensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR);
+
         mSensorManager.registerListener(new SensorEventListener() {
             @Override
             public void onSensorChanged(SensorEvent event) {
-                float[] rotationMatrix=new float[16];
+                switch(event.sensor.getType()) {
+                    //case Sensor.TYPE_ACCELEROMETER:
+                    //    float[] acc = event.values;
+                    //    Log.d("bleremote", "acc:" + Float.toString(acc[0]) + " " + Float.toString(acc[1]) + " " + Float.toString(acc[2]));
+                    //    break;
+                    case Sensor.TYPE_GYROSCOPE:
+                        float[] gyro = event.values;
+                        //Log.d("bleremote", "gyro:" + Float.toString(gyro[0]) + " " + Float.toString(gyro[1]) + " " + Float.toString(gyro[2]));
+                        Log.d("bleremote", "gyro:" + Float.toString(gyro[2]));
+                        break;
+                }
+                /*float[] rotationMatrix=new float[16];
                 mSensorManager.getRotationMatrixFromVector(rotationMatrix,event.values);
 
                 float[] orientationValues = new float[3];
                 SensorManager.getOrientation(rotationMatrix, orientationValues);
                 double azimuth = Math.toDegrees(orientationValues[0]);
                 double pitch = Math.toDegrees(orientationValues[1]);
-                float roll = (float)Math.toDegrees(orientationValues[2]);
-                //Log.d("bleremote", "roll:" + Float.toString(roll));
+                float roll = (float)Math.toDegrees(orientationValues[2]);*/
             }
 
             @Override
             public void onAccuracyChanged(Sensor sensor, int accuracy) {
             }
-        },mSensor, SensorManager.SENSOR_DELAY_NORMAL);
-        */
+        },mSensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE), SensorManager.SENSOR_DELAY_NORMAL);
+
+        mSensorManager.registerListener(new SensorEventListener() {
+            @Override
+            public void onSensorChanged(SensorEvent event) {
+                switch(event.sensor.getType()) {
+                    case Sensor.TYPE_ACCELEROMETER:
+                        float[] acc = event.values;
+                        float a = (float)Math.toDegrees(Math.atan2(acc[0],acc[1]));
+                        if(a <= -90)
+                            a = 180;
+                        else if(a < 0)
+                            a = 0;
+
+                        if(acc[2] > 5)
+                            angle = 0;
+                        else
+                            angle = -(a - 90);
+                        //Log.d("bleremote", "acc:" + Float.toString(acc[0]) + " " + Float.toString(acc[1]) + " " + Float.toString(acc[2]));
+                        //Log.d("bleremote", "acc:" + Float.toString(acc[0]) + " " + Float.toString(acc[1]));
+                        Log.d("bleremote", "angle: " + Float.toString(angle));
+                        break;
+                    //case Sensor.TYPE_GYROSCOPE:
+                    //    float[] gyro = event.values;
+                    //    Log.d("bleremote", "gyro:" + Float.toString(gyro[0]) + " " + Float.toString(gyro[1]) + " " + Float.toString(gyro[2]));
+                    //    break;
+                }
+                /*float[] rotationMatrix=new float[16];
+                mSensorManager.getRotationMatrixFromVector(rotationMatrix,event.values);
+
+                float[] orientationValues = new float[3];
+                SensorManager.getOrientation(rotationMatrix, orientationValues);
+                double azimuth = Math.toDegrees(orientationValues[0]);
+                double pitch = Math.toDegrees(orientationValues[1]);
+                float roll = (float)Math.toDegrees(orientationValues[2]);*/
+            }
+
+            @Override
+            public void onAccuracyChanged(Sensor sensor, int accuracy) {
+            }
+        },mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER), SensorManager.SENSOR_DELAY_NORMAL);
 
         BluetoothManager btManager = (BluetoothManager)getSystemService(Context.BLUETOOTH_SERVICE);
 
@@ -329,6 +404,15 @@ public class MainActivity extends ActionBarActivity {
         }
 
         @Override
+        public void onCharacteristicRead (BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status) {
+            byte[] value = battery.getValue();
+            if(value.length == 2) {
+                setBattery(((float)((int)value[0] + (int)value[1] * 256)) / 1000);
+            }
+
+        }
+
+        @Override
         public void onConnectionStateChange(final BluetoothGatt gatt, final int status, final int newState) {
             if(remoteDevice != null && gatt.getDevice().getAddress() == remoteDevice.getAddress()) {
                 // this will get called when a device connects or disconnects
@@ -356,7 +440,11 @@ public class MainActivity extends ActionBarActivity {
                         if(c.getUuid().compareTo(UUID.fromString("0000a010-0000-1000-8000-00805F9B34FB"))==0){
                             setState("Connected");
                             control = c;
-                            return;
+                            //return;
+                        }
+                        else if(c.getUuid().compareTo(UUID.fromString("0000a001-0000-1000-8000-00805F9B34FB"))==0) {
+                            battery = c;
+                            //return;
                         }
                     }
                 }
@@ -378,6 +466,17 @@ public class MainActivity extends ActionBarActivity {
         });
 
     }
+
+    public void setBattery(final float volt) {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                ((TextView)findViewById(R.id.textView)).setText(Float.toString(volt) + "mV");
+            }
+        });
+
+    }
+
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         // Inflate the menu; this adds items to the action bar if it is present.
