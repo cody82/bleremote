@@ -59,6 +59,8 @@ public class MainActivity extends ActionBarActivity {
     static volatile boolean blink_right = false;
     static volatile boolean beep = false;
 
+    static volatile int forward_max = 70;
+    static volatile int backward_max = 50;
 
     MainActivity x = this;
     static BluetoothDevice remoteDevice;
@@ -85,9 +87,9 @@ public class MainActivity extends ActionBarActivity {
             if (forward == backward) {
                 msg[1] = 0;
             } else if (forward) {
-                msg[1] = 50;
+                msg[1] = (byte)forward_max;
             } else if (backward) {
-                msg[1] = -40;
+                msg[1] = (byte)-backward_max;
             }
 
             float max = 100;
@@ -382,7 +384,7 @@ public class MainActivity extends ActionBarActivity {
         sb.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                front_light = (byte)sb.getProgress();
+                front_light = (byte) sb.getProgress();
             }
 
             @Override
@@ -395,6 +397,42 @@ public class MainActivity extends ActionBarActivity {
 
             }
         });
+
+        final SeekBar sb2 = (SeekBar) findViewById(R.id.seekBar2);
+        sb2.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                forward_max = sb2.getProgress();
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {
+
+            }
+
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {
+
+            }
+        });
+        final SeekBar sb3 = (SeekBar) findViewById(R.id.seekBar3);
+        sb3.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                backward_max = sb3.getProgress();
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {
+
+            }
+
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {
+
+            }
+        });
+
         //btAdapter.stopLeScan(leScanCallback);
     }
 
@@ -495,7 +533,7 @@ public class MainActivity extends ActionBarActivity {
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                ((TextView) findViewById(R.id.textView)).setText(Float.toString(volt) + "mV");
+                ((TextView) findViewById(R.id.textView)).setText(Float.toString(volt).replace('.',',') + "V");
             }
         });
 
