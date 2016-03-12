@@ -470,10 +470,15 @@ public class MainActivity extends ActionBarActivity {
         @Override
         public void onCharacteristicRead(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status) {
             byte[] value = battery.getValue();
-            if (value.length == 2) {
+            if (value.length >= 2) {
                 setBattery(((float) ((int) value[0] + (int) value[1] * 256)) / 1000);
             }
-
+            if (value.length >= 3) {
+                setFrontDist(value[2]);
+            }
+            if (value.length >= 4) {
+                setBackDist(value[3]);
+            }
         }
 
         @Override
@@ -536,7 +541,22 @@ public class MainActivity extends ActionBarActivity {
                 ((TextView) findViewById(R.id.textView)).setText(Float.toString(volt).replace('.',',') + "V");
             }
         });
-
+    }
+    public void setFrontDist(final int cm) {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                ((TextView) findViewById(R.id.textView4)).setText(Integer.toString(cm) + "cm");
+            }
+        });
+    }
+    public void setBackDist(final int cm) {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                ((TextView) findViewById(R.id.textView5)).setText(Integer.toString(cm) + "cm");
+            }
+        });
     }
 
     @Override

@@ -134,6 +134,14 @@
                 android:layout_span="2"
                 android:max="120"
                 android:progress="70" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textAppearance="?android:attr/textAppearanceMedium"
+                android:text="SonarF"
+                android:id="@+id/textView4"
+                android:layout_column="5" />
         </TableRow>
 
         <TableRow
@@ -148,6 +156,14 @@
                 android:layout_span="2"
                 android:progress="50"
                 android:max="120" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:textAppearance="?android:attr/textAppearanceMedium"
+                android:text="SonarB"
+                android:id="@+id/textView5"
+                android:layout_column="5" />
         </TableRow>
     </TableLayout>
 
