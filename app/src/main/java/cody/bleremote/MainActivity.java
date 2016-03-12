@@ -24,6 +24,7 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.widget.Button;
 import android.widget.CompoundButton;
+import android.widget.SeekBar;
 import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.ToggleButton;
@@ -44,6 +45,9 @@ public class MainActivity extends ActionBarActivity {
     Sensor mSensor;
 
     static volatile float angle = 0;
+    static volatile float gyro_integral = 0;
+    static volatile long time = System.currentTimeMillis();
+    static volatile float angle_fusion = 0;
 
     static volatile boolean left = false;
     static volatile boolean right = false;
@@ -73,47 +77,41 @@ public class MainActivity extends ActionBarActivity {
 
     int sendtick = 0;
 
-    void Send()
-    {
+    void Send() {
         sendtick++;
-        if(control != null)
-        {
+        if (control != null) {
             byte[] msg = new byte[7];
 
-            if(forward == backward) {
+            if (forward == backward) {
                 msg[1] = 0;
-            }
-            else if(forward) {
+            } else if (forward) {
                 msg[1] = 50;
-            }
-            else if(backward) {
+            } else if (backward) {
                 msg[1] = -40;
             }
 
-            if(angle==0) {
+            float max = 100;
+            float min = -100;
+            float mid = (max + min) / 2;
+            float range = (max - min) / 2;
+
+            if (angle == 0) {
                 if (right == left) {
-                    msg[0] = -20;
+                    msg[0] = (byte) mid;
                 } else if (right) {
-                    msg[0] = 70;
+                    msg[0] = (byte) max;
                 } else if (left) {
-                    msg[0] = -100;
+                    msg[0] = (byte) min;
                 }
-            }
-            else {
-
-                float max = 70;
-                float min = -100;
-                float mid = (max + min) / 2;
-                float range = (max - min) / 2;
-
-                msg[0] = (byte) ((angle / 90) * range + mid);
+            } else {
+                msg[0] = (byte) ((angle_fusion / 90) * range + mid);
             }
 
             msg[6] = (byte) (beep ? 1 : 0);
             msg[3] = (byte) (top_light ? 1 : 0);
             msg[2] = front_light;
-            msg[4] = (byte)(blink_left ? 1 : 0);
-            msg[5] = (byte)(blink_right ? 1 : 0);
+            msg[4] = (byte) (blink_left ? 1 : 0);
+            msg[5] = (byte) (blink_right ? 1 : 0);
 
             control.setValue(msg);
             control.setWriteType(BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE);
@@ -121,10 +119,11 @@ public class MainActivity extends ActionBarActivity {
 
         }
 
-        if((battery != null) && (sendtick % 5 == 0)){
+        if ((battery != null) && (sendtick % 5 == 0)) {
             btGatt.readCharacteristic(battery);
         }
     }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -150,18 +149,31 @@ public class MainActivity extends ActionBarActivity {
         mSensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
         //mSensor = mSensorManager.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR);
 
+        time = System.currentTimeMillis();
         mSensorManager.registerListener(new SensorEventListener() {
             @Override
             public void onSensorChanged(SensorEvent event) {
-                switch(event.sensor.getType()) {
+                switch (event.sensor.getType()) {
                     //case Sensor.TYPE_ACCELEROMETER:
                     //    float[] acc = event.values;
                     //    Log.d("bleremote", "acc:" + Float.toString(acc[0]) + " " + Float.toString(acc[1]) + " " + Float.toString(acc[2]));
                     //    break;
                     case Sensor.TYPE_GYROSCOPE:
+                        long t = System.currentTimeMillis();
+                        long delta = t - time;
+                        time = t;
                         float[] gyro = event.values;
                         //Log.d("bleremote", "gyro:" + Float.toString(gyro[0]) + " " + Float.toString(gyro[1]) + " " + Float.toString(gyro[2]));
-                        Log.d("bleremote", "gyro:" + Float.toString(gyro[2]));
+                        //Log.d("bleremote", "gyro:" + Float.toString(gyro[2]));
+                        gyro_integral -= Math.toDegrees(((float) delta * 0.001f) * gyro[2]);
+                        angle_fusion = (0.90f * (angle_fusion - (float) Math.toDegrees(((float) delta * 0.001f) * gyro[2]))) + (0.10f * angle);
+                        if (angle_fusion > 90)
+                            angle_fusion = 90;
+                        else if (angle_fusion < -90)
+                            angle_fusion = -90;
+                        //Log.d("bleremote", "gyro_integral:" + Float.toString(gyro_integral));
+                        //Log.d("bleremote", "angle_fusion:" + Float.toString(angle_fusion));
+                        //Log.d("bleremote", "delta:" + Long.toString(delta));
                         break;
                 }
                 /*float[] rotationMatrix=new float[16];
@@ -177,27 +189,27 @@ public class MainActivity extends ActionBarActivity {
             @Override
             public void onAccuracyChanged(Sensor sensor, int accuracy) {
             }
-        },mSensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE), SensorManager.SENSOR_DELAY_NORMAL);
+        }, mSensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE), SensorManager.SENSOR_DELAY_GAME);
 
         mSensorManager.registerListener(new SensorEventListener() {
             @Override
             public void onSensorChanged(SensorEvent event) {
-                switch(event.sensor.getType()) {
+                switch (event.sensor.getType()) {
                     case Sensor.TYPE_ACCELEROMETER:
                         float[] acc = event.values;
-                        float a = (float)Math.toDegrees(Math.atan2(acc[0],acc[1]));
-                        if(a <= -90)
+                        float a = (float) Math.toDegrees(Math.atan2(acc[0], acc[1]));
+                        if (a <= -90)
                             a = 180;
-                        else if(a < 0)
+                        else if (a < 0)
                             a = 0;
 
-                        if(acc[2] > 5)
+                        if (acc[2] > 5)
                             angle = 0;
                         else
                             angle = -(a - 90);
                         //Log.d("bleremote", "acc:" + Float.toString(acc[0]) + " " + Float.toString(acc[1]) + " " + Float.toString(acc[2]));
                         //Log.d("bleremote", "acc:" + Float.toString(acc[0]) + " " + Float.toString(acc[1]));
-                        Log.d("bleremote", "angle: " + Float.toString(angle));
+                        //Log.d("bleremote", "angle: " + Float.toString(angle));
                         break;
                     //case Sensor.TYPE_GYROSCOPE:
                     //    float[] gyro = event.values;
@@ -217,38 +229,36 @@ public class MainActivity extends ActionBarActivity {
             @Override
             public void onAccuracyChanged(Sensor sensor, int accuracy) {
             }
-        },mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER), SensorManager.SENSOR_DELAY_NORMAL);
+        }, mSensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER), SensorManager.SENSOR_DELAY_GAME);
 
-        BluetoothManager btManager = (BluetoothManager)getSystemService(Context.BLUETOOTH_SERVICE);
+        BluetoothManager btManager = (BluetoothManager) getSystemService(Context.BLUETOOTH_SERVICE);
 
         btAdapter = btManager.getAdapter();
 
-        if(!btAdapter.isEnabled()) {
-            if(!btAdapter.enable())
+        if (!btAdapter.isEnabled()) {
+            if (!btAdapter.enable())
                 throw new RuntimeException("bluetooth problem");
             //while(!btAdapter.isEnabled()) {
-                try {
-                    Thread.sleep(4000);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
+            try {
+                Thread.sleep(4000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
             //}
         }
 
         remoteDevice = btAdapter.getRemoteDevice("F2:24:4D:E3:42:0F");
 
-        if(remoteDevice == null) {
+        if (remoteDevice == null) {
             if (!btAdapter.startLeScan(leScanCallback))
                 throw new RuntimeException("lescan");
             setState("Scanning");
-        }
-        else
-        {
+        } else {
             setState("Connecting");
             btGatt = remoteDevice.connectGatt(x, false, btleGattCallback);
         }
 
-        TimerTask timer3= new TimerTask(){
+        TimerTask timer3 = new TimerTask() {
             @Override
             public void run() {
                 Send();
@@ -257,9 +267,9 @@ public class MainActivity extends ActionBarActivity {
         };
 
         Timer t = new Timer();
-        t.scheduleAtFixedRate(timer3, 0, 200);
+        t.scheduleAtFixedRate(timer3, 0, 50);
 
-        Button b = (Button)findViewById(R.id.button_left);
+        Button b = (Button) findViewById(R.id.button_left);
         b.setOnTouchListener(new View.OnTouchListener() {
             @Override
             public boolean onTouch(View v, MotionEvent event) {
@@ -273,15 +283,14 @@ public class MainActivity extends ActionBarActivity {
                 return true;
             }
         });
-        b = (Button)findViewById(R.id.button_right);
+        b = (Button) findViewById(R.id.button_right);
         b.setOnTouchListener(new View.OnTouchListener() {
             @Override
             public boolean onTouch(View v, MotionEvent event) {
 
-                if(event.getAction() == MotionEvent.ACTION_UP){
+                if (event.getAction() == MotionEvent.ACTION_UP) {
                     right = false;
-                }
-                else if(event.getAction() == MotionEvent.ACTION_DOWN){
+                } else if (event.getAction() == MotionEvent.ACTION_DOWN) {
                     right = true;
                 }
                 //Send();
@@ -289,15 +298,14 @@ public class MainActivity extends ActionBarActivity {
             }
         });
 
-        b = (Button)findViewById(R.id.button_forward);
+        b = (Button) findViewById(R.id.button_forward);
         b.setOnTouchListener(new View.OnTouchListener() {
             @Override
             public boolean onTouch(View v, MotionEvent event) {
 
-                if(event.getAction() == MotionEvent.ACTION_UP){
+                if (event.getAction() == MotionEvent.ACTION_UP) {
                     forward = false;
-                }
-                else if(event.getAction() == MotionEvent.ACTION_DOWN){
+                } else if (event.getAction() == MotionEvent.ACTION_DOWN) {
                     forward = true;
                 }
                 //Send();
@@ -305,15 +313,14 @@ public class MainActivity extends ActionBarActivity {
             }
         });
 
-        b = (Button)findViewById(R.id.button_backward);
+        b = (Button) findViewById(R.id.button_backward);
         b.setOnTouchListener(new View.OnTouchListener() {
             @Override
             public boolean onTouch(View v, MotionEvent event) {
 
-                if(event.getAction() == MotionEvent.ACTION_UP){
+                if (event.getAction() == MotionEvent.ACTION_UP) {
                     backward = false;
-                }
-                else if(event.getAction() == MotionEvent.ACTION_DOWN){
+                } else if (event.getAction() == MotionEvent.ACTION_DOWN) {
                     backward = true;
                 }
                 //Send();
@@ -321,7 +328,7 @@ public class MainActivity extends ActionBarActivity {
             }
         });
 
-        b = (Button)findViewById(R.id.beep);
+        b = (Button) findViewById(R.id.beep);
         b.setOnTouchListener(new View.OnTouchListener() {
             @Override
             public boolean onTouch(View v, MotionEvent event) {
@@ -336,7 +343,7 @@ public class MainActivity extends ActionBarActivity {
             }
         });
 
-        ToggleButton tb = (ToggleButton)findViewById(R.id.blink_left);
+        ToggleButton tb = (ToggleButton) findViewById(R.id.blink_left);
         tb.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
@@ -344,7 +351,7 @@ public class MainActivity extends ActionBarActivity {
                 //Send();
             }
         });
-        tb = (ToggleButton)findViewById(R.id.blink_right);
+        tb = (ToggleButton) findViewById(R.id.blink_right);
         tb.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
@@ -353,7 +360,7 @@ public class MainActivity extends ActionBarActivity {
             }
         });
 
-        final Switch sw = (Switch)findViewById(R.id.blue);
+        final Switch sw = (Switch) findViewById(R.id.blue);
         sw.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
@@ -361,12 +368,31 @@ public class MainActivity extends ActionBarActivity {
                 //Send();
             }
         });
+        /*
         final Switch sw2 = (Switch)findViewById(R.id.light);
         sw2.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
             @Override
             public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
                 front_light = (byte) (isChecked ? 255 : 0);
                 //Send();
+            }
+        });*/
+
+        final SeekBar sb = (SeekBar) findViewById(R.id.seekBar);
+        sb.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                front_light = (byte)sb.getProgress();
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {
+
+            }
+
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {
+
             }
         });
         //btAdapter.stopLeScan(leScanCallback);
@@ -377,7 +403,7 @@ public class MainActivity extends ActionBarActivity {
         public void onLeScan(final BluetoothDevice device, final int rssi, final byte[] scanRecord) {
             // your implementation here
             String mac = device.getAddress();
-            if(mac.compareTo("D1:E4:D4:1E:12:F2") == 0 ||
+            if (mac.compareTo("D1:E4:D4:1E:12:F2") == 0 ||
                     mac.compareTo("F2:24:4D:E3:42:0F") == 0) {
                 remoteDevice = device;
                 btAdapter.stopLeScan(leScanCallback);
@@ -404,17 +430,17 @@ public class MainActivity extends ActionBarActivity {
         }
 
         @Override
-        public void onCharacteristicRead (BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status) {
+        public void onCharacteristicRead(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status) {
             byte[] value = battery.getValue();
-            if(value.length == 2) {
-                setBattery(((float)((int)value[0] + (int)value[1] * 256)) / 1000);
+            if (value.length == 2) {
+                setBattery(((float) ((int) value[0] + (int) value[1] * 256)) / 1000);
             }
 
         }
 
         @Override
         public void onConnectionStateChange(final BluetoothGatt gatt, final int status, final int newState) {
-            if(remoteDevice != null && gatt.getDevice().getAddress() == remoteDevice.getAddress()) {
+            if (remoteDevice != null && gatt.getDevice().getAddress() == remoteDevice.getAddress()) {
                 // this will get called when a device connects or disconnects
                 if (newState == BluetoothProfile.STATE_CONNECTED) {
                     setState("Discover Services");
@@ -429,20 +455,19 @@ public class MainActivity extends ActionBarActivity {
 
         @Override
         public void onServicesDiscovered(final BluetoothGatt gatt, final int status) {
-            if(!gatt.equals(btGatt))
+            if (!gatt.equals(btGatt))
                 return;
             // this will get called after the client initiates a BluetoothGatt.discoverServices() call
             List<BluetoothGattService> services = gatt.getServices();
             for (BluetoothGattService service : services) {
-                if(service.getUuid().compareTo(UUID.fromString("0000a000-0000-1000-8000-00805F9B34FB")) == 0) {
+                if (service.getUuid().compareTo(UUID.fromString("0000a000-0000-1000-8000-00805F9B34FB")) == 0) {
                     List<BluetoothGattCharacteristic> characteristics = service.getCharacteristics();
                     for (BluetoothGattCharacteristic c : characteristics) {
-                        if(c.getUuid().compareTo(UUID.fromString("0000a010-0000-1000-8000-00805F9B34FB"))==0){
+                        if (c.getUuid().compareTo(UUID.fromString("0000a010-0000-1000-8000-00805F9B34FB")) == 0) {
                             setState("Connected");
                             control = c;
                             //return;
-                        }
-                        else if(c.getUuid().compareTo(UUID.fromString("0000a001-0000-1000-8000-00805F9B34FB"))==0) {
+                        } else if (c.getUuid().compareTo(UUID.fromString("0000a001-0000-1000-8000-00805F9B34FB")) == 0) {
                             battery = c;
                             //return;
                         }
@@ -450,8 +475,7 @@ public class MainActivity extends ActionBarActivity {
                 }
             }
 
-            if(control == null)
-            {
+            if (control == null) {
                 throw new RuntimeException("control characteristic missing");
             }
         }
@@ -461,7 +485,7 @@ public class MainActivity extends ActionBarActivity {
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                ((TextView)findViewById(R.id.textView2)).setText(state);
+                ((TextView) findViewById(R.id.textView2)).setText(state);
             }
         });
 
@@ -471,7 +495,7 @@ public class MainActivity extends ActionBarActivity {
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                ((TextView)findViewById(R.id.textView)).setText(Float.toString(volt) + "mV");
+                ((TextView) findViewById(R.id.textView)).setText(Float.toString(volt) + "mV");
             }
         });
 
@@ -494,9 +518,8 @@ public class MainActivity extends ActionBarActivity {
         //noinspection SimplifiableIfStatement
         if (id == R.id.action_settings) {
             return true;
-        }
-        else if(id == R.id.action_quit) {
-            if(btGatt!=null) {
+        } else if (id == R.id.action_quit) {
+            if (btGatt != null) {
                 btGatt.disconnect();
                 btGatt.close();
             }
@@ -506,4 +529,5 @@ public class MainActivity extends ActionBarActivity {
 
         return super.onOptionsItemSelected(item);
     }
+
 }

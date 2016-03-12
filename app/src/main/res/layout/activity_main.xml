@@ -30,6 +30,15 @@
                 android:id="@+id/button_forward"
                 android:layout_column="1" />
 
+            <SeekBar
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:id="@+id/seekBar"
+                android:layout_column="3"
+                android:layout_span="2"
+                android:progress="0"
+                android:max="255" />
+
             <Switch
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -74,13 +83,6 @@
                 android:text="New ToggleButton"
                 android:id="@+id/blink_right"
                 android:layout_column="4" />
-
-            <Switch
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Licht"
-                android:id="@+id/light"
-                android:layout_column="5" />
 
         </TableRow>
 
